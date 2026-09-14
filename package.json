@@ -1,0 +1,7 @@
+{
+  "name": "documenty",
+  "private": true,
+  "scripts": {
+    "build": "npm --prefix web install && npm --prefix web run build"
+  }
+}
