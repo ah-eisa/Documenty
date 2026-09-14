@@ -41,7 +41,11 @@ def delete_document(db, document_id, delete_file=True):
     obj = get_document(db, document_id)
     if not obj: return False
     db.query(Reminder).filter(Reminder.source_type == "document", Reminder.source_id == document_id).delete(synchronize_session=False)
-    if delete_file and obj.file_path: Path(obj.file_path).unlink(missing_ok=True)
+    if delete_file and obj.file_path:
+        path = Path(obj.file_path).resolve()
+        from config import settings
+        if path.parent == settings.FILES_DIR.resolve():
+            path.unlink(missing_ok=True)
     db.delete(obj); db.commit(); return True
 
 def create_event(db, **data):
@@ -81,9 +85,12 @@ def mark_reminder_sent(db, reminder): reminder.sent = True; db.commit()
 def get_recent_reminders(db, limit=10): return db.query(Reminder).order_by(Reminder.id.desc()).limit(limit).all()
 
 def get_dashboard_stats(db):
-    today = date.today(); in_30 = today + timedelta(days=30); in_7 = today + timedelta(days=7)
+    today = date.today(); in_7 = today + timedelta(days=7); in_30 = today + timedelta(days=30); in_90 = today + timedelta(days=90)
     return {"documents_count": db.query(func.count(Document.id)).scalar() or 0, "events_count": db.query(func.count(Event.id)).scalar() or 0,
-            "expiring_30_count": db.query(func.count(Document.id)).filter(Document.expiry_date >= today, Document.expiry_date <= in_30).scalar() or 0,
+            "expiring_7_count": db.query(func.count(Document.id)).filter(Document.expiry_date.isnot(None), Document.expiry_date >= today, Document.expiry_date <= in_7).scalar() or 0,
+            "expiring_30_count": db.query(func.count(Document.id)).filter(Document.expiry_date.isnot(None), Document.expiry_date >= today, Document.expiry_date <= in_30).scalar() or 0,
+            "expiring_90_count": db.query(func.count(Document.id)).filter(Document.expiry_date.isnot(None), Document.expiry_date >= today, Document.expiry_date <= in_90).scalar() or 0,
             "overdue_count": db.query(func.count(Document.id)).filter(Document.expiry_date < today).scalar() or 0,
             "upcoming_events_30_count": db.query(func.count(Event.id)).filter(Event.event_date >= today, Event.event_date <= in_30).scalar() or 0,
-            "critical_count": db.query(func.count(Document.id)).filter(Document.expiry_date.isnot(None), or_(Document.expiry_date < today, Document.expiry_date <= in_7)).scalar() or 0}
+            "critical_count": db.query(func.count(Document.id)).filter(Document.expiry_date.isnot(None), or_(Document.expiry_date < today, Document.expiry_date <= in_7)).scalar() or 0,
+            "latest_uploads": db.query(Document).order_by(Document.created_at.desc()).limit(10).all()}

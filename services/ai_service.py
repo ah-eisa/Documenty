@@ -1,11 +1,12 @@
 from __future__ import annotations
-import json, re
+import json, logging, re
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 import httpx
 from dateutil import parser as date_parser
 from config import settings
+logger = logging.getLogger(__name__)
 DOC_TYPES = ["Passport", "Visa", "Insurance", "Contract", "Lease", "Bank Document", "Investment Document", "License", "Certificate", "Personal Document", "Other"]
 KEYWORDS = {"Passport": ["passport", "جواز"], "Visa": ["visa", "تأشيرة", "تاشيرة"], "Insurance": ["insurance", "تأمين", "تامين"], "Contract": ["contract", "عقد"], "Lease": ["lease", "إيجار", "ايجار"], "Bank Document": ["bank", "بنك", "statement"], "Investment Document": ["investment", "استثمار", "portfolio"], "License": ["license", "رخصة", "ترخيص"], "Certificate": ["certificate", "شهادة"], "Personal Document": ["personal", "هوية", "identity"]}
 
@@ -34,7 +35,9 @@ def _call_llm(messages):
     try:
         response = httpx.post(f"{settings.OPENAI_BASE_URL.rstrip('/')}/chat/completions", headers={"Authorization": f"Bearer {settings.OPENAI_API_KEY}"}, json={"model": settings.OPENAI_MODEL, "messages": messages, "temperature": 0}, timeout=180)
         response.raise_for_status(); return response.json()["choices"][0]["message"]["content"]
-    except Exception: return None
+    except Exception as exc:
+        logger.warning("AI extraction request failed: %s", exc)
+        return None
 
 def _heuristic(text):
     lowered = text.lower(); kind = next((k for k, words in KEYWORDS.items() if any(w.lower() in lowered for w in words)), "Other")
@@ -46,10 +49,26 @@ def extract_document_info(text, file_name):
     heuristic = _heuristic(text or "")
     prompt = f"Extract JSON with document_type, owner_name, issue_date, expiry_date, reference_number, important_dates, notes from this text. Types: {DOC_TYPES}. Dates YYYY-MM-DD.\n{text[:settings.MAX_AI_TEXT_CHARS]}"
     raw = _call_llm([{"role": "system", "content": "Return only valid JSON."}, {"role": "user", "content": prompt}])
-    try: parsed = json.loads(raw) if raw else {}
-    except Exception: parsed = {}
-    data = {key: parsed.get(key) or heuristic.get(key) for key in heuristic}
-    return {**data, "document_name": Path(file_name).stem, "document_type": normalize_doc_type(data.get("document_type")), "issue_date": parse_date_to_iso(data.get("issue_date")), "expiry_date": parse_date_to_iso(data.get("expiry_date"))}
+    try:
+        parsed = json.loads(raw) if raw else {}
+    except (TypeError, json.JSONDecodeError):
+        parsed = {}
+    if not isinstance(parsed, dict):
+        parsed = {}
+    data = dict(heuristic)
+    for key in heuristic:
+        value = parsed.get(key)
+        if key == "important_dates" and isinstance(value, list):
+            data[key] = value
+        elif key != "important_dates" and isinstance(value, (str, int, float)) and str(value).strip():
+            data[key] = value
+    data["document_type"] = normalize_doc_type(data.get("document_type"))
+    data["issue_date"] = parse_date_to_iso(data.get("issue_date"))
+    data["expiry_date"] = parse_date_to_iso(data.get("expiry_date"))
+    data["document_name"] = Path(file_name).stem
+    data["source"] = "ai+heuristic" if parsed else "heuristic"
+    data["confidence"] = "medium" if parsed else "low"
+    return data
 
 def parse_search_query(query):
     lowered = (query or "").lower().translate(str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789")); filters = {"q": None, "document_type": None, "expiry_within_days": None, "expiry_year": None, "sort_by": "expiry_date", "order": "asc"}

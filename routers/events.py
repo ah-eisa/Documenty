@@ -4,7 +4,8 @@ from database import repository
 from database.db import get_db
 from schemas import EventCreate, EventOut, EventUpdate
 from services import reminder_service
-router = APIRouter(prefix="/api/events", tags=["events"])
+from services.security import current_session
+router = APIRouter(prefix="/api/events", tags=["events"], dependencies=[Depends(current_session)])
 @router.post("", response_model=EventOut)
 def create_event(payload: EventCreate, db: Session = Depends(get_db)):
     obj = repository.create_event(db, **payload.model_dump()); reminder_service.sync_event_reminders(db, obj); return obj

@@ -30,6 +30,10 @@ class Settings:
     @property
     def API_BASE_URL(self) -> str: return os.getenv("API_BASE_URL", f"http://{self.HOST}:{self.PORT}")
     @property
+    def FRONTEND_ORIGINS(self) -> list[str]:
+        raw = os.getenv("FRONTEND_ORIGINS", "http://localhost:8501,http://127.0.0.1:8501")
+        return [item.strip().rstrip("/") for item in raw.split(",") if item.strip()]
+    @property
     def TIMEZONE(self) -> str: return os.getenv("TIMEZONE", "UTC")
     @property
     def LOG_LEVEL(self) -> str: return os.getenv("LOG_LEVEL", "INFO").upper()
@@ -58,6 +62,20 @@ class Settings:
     def TESSERACT_CMD(self) -> str: return os.getenv("TESSERACT_CMD", "")
     @property
     def MAX_AI_TEXT_CHARS(self) -> int: return int(os.getenv("MAX_AI_TEXT_CHARS", "12000"))
+    @property
+    def MAX_UPLOAD_SIZE_MB(self) -> int: return max(1, int(os.getenv("MAX_UPLOAD_SIZE_MB", "25")))
+    @property
+    def AUTH_PASSWORD_HASH(self) -> str: return os.getenv("AUTH_PASSWORD_HASH", "")
+    @property
+    def SESSION_TTL_HOURS(self) -> int: return max(1, int(os.getenv("SESSION_TTL_HOURS", "12")))
+    @property
+    def ENCRYPTION_KEY(self) -> str: return os.getenv("ENCRYPTION_KEY", "")
+    @property
+    def BACKUP_ENCRYPTION_KEY(self) -> str: return os.getenv("BACKUP_ENCRYPTION_KEY", "") or self.ENCRYPTION_KEY
+    @property
+    def BACKUP_DIR(self) -> Path: return _resolve_path(os.getenv("BACKUP_DIR"), BASE_DIR / "backups")
+    @property
+    def BACKUP_RETENTION(self) -> int: return max(1, int(os.getenv("BACKUP_RETENTION", "7")))
 
 
 settings = Settings()
@@ -67,6 +85,7 @@ def ensure_dirs() -> None:
     settings.FILES_DIR.mkdir(parents=True, exist_ok=True)
     settings.LOGS_DIR.mkdir(parents=True, exist_ok=True)
     (BASE_DIR / "data").mkdir(parents=True, exist_ok=True)
+    settings.BACKUP_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def update_env_file(updates: dict[str, str]) -> None:

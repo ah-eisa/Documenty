@@ -15,9 +15,16 @@ DOCUMENT_TYPES = ["Passport", "Visa", "Insurance", "Contract", "Lease", "Bank Do
 st.set_page_config(page_title="Personal Operations Copilot", page_icon="DOC", layout="wide")
 
 def api(method, path, **kwargs):
+    headers = dict(kwargs.pop("headers", {}) or {})
+    token = st.session_state.get("access_token")
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
     try:
-        response = requests.request(method, API_BASE_URL.rstrip("/") + path, timeout=300, **kwargs)
+        response = requests.request(method, API_BASE_URL.rstrip("/") + path, timeout=300, headers=headers, **kwargs)
         if response.status_code >= 400:
+            if response.status_code == 401:
+                st.session_state.pop("access_token", None)
+                st.rerun()
             st.error(response.json().get("detail", response.text)); return None
         return response.json() if response.text else {}
     except requests.RequestException as exc:
@@ -92,6 +99,24 @@ def settings_page():
     if st.button("Send Telegram test"): api("POST", "/api/settings/test-telegram")
 
 def main():
+    if not st.session_state.get("access_token"):
+        login_page()
+        return
     page = st.sidebar.radio("Navigate", ["Dashboard", "Documents", "Events", "Smart search", "Settings"])
+    if st.sidebar.button("Sign out"):
+        api("POST", "/api/auth/logout")
+        st.session_state.pop("access_token", None)
+        st.rerun()
     {"Dashboard": dashboard, "Documents": documents, "Events": events, "Smart search": search, "Settings": settings_page}[page]()
+
+def login_page():
+    st.title("Documenty Vault")
+    st.caption("Sign in to access your private document vault.")
+    with st.form("login"):
+        password = st.text_input("Password", type="password")
+        if st.form_submit_button("Sign in", type="primary"):
+            result = api("POST", "/api/auth/login", json={"password": password})
+            if result and result.get("access_token"):
+                st.session_state["access_token"] = result["access_token"]
+                st.rerun()
 if __name__ == "__main__": main()
