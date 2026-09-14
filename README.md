@@ -13,6 +13,27 @@ cp .env.example .env
 
 On Windows, activate with `.venv\\Scripts\\activate` and copy the environment file with `copy .env.example .env`.
 
+## Run In GitHub Codespaces
+
+The repository includes `.devcontainer/devcontainer.json`, which installs Python dependencies, Tesseract, and Arabic OCR data, and forwards ports `8000` (FastAPI) and `8501` (Streamlit). Rebuild the container after changing the devcontainer configuration.
+
+For an existing Codespace, start both services with:
+
+```bash
+./start.sh
+```
+
+Open the forwarded **Documenty Streamlit** port in the Ports panel. The backend health URL is the forwarded **Documenty API** port followed by `/health`. In this Codespace the URLs are:
+
+- Streamlit: `https://solid-doodle-xrrqr66pg7g2vp69-8501.app.github.dev`
+- FastAPI health: `https://solid-doodle-xrrqr66pg7g2vp69-8000.app.github.dev/health`
+
+Codespace names are unique, so use the URLs shown in the Ports panel for another Codespace. When `CODESPACES=true`, Documenty derives the API public URL and Streamlit CORS origin from `CODESPACE_NAME` and `GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN`. The Streamlit server calls FastAPI through `127.0.0.1`, while both processes bind to `0.0.0.0` only so forwarded ports can reach them. Production and non-Codespaces defaults remain local-only.
+
+Configure Codespaces Secrets or environment variables before starting the app. Required secrets are `AUTH_PASSWORD_HASH`, `ENCRYPTION_KEY`, and `BACKUP_ENCRYPTION_KEY`; optional secrets are `OPENAI_API_KEY` and `TELEGRAM_BOT_TOKEN`. Never paste them into committed files or terminal commands.
+
+Codespace persistence is not permanent backup storage. Source code is in GitHub; `data/app.db`, `files/`, `backups/`, and `logs/` live on the Codespace filesystem and can disappear when the Codespace is deleted or rebuilt. Create an encrypted backup from Settings or the API, then download it from `GET /api/settings/backups/{name}/download` and move it to a persistent external location. Keep the encryption key separately in Codespaces Secrets.
+
 ## Documenty Personal Document Vault
 
 Documenty is a local-first personal document vault built with FastAPI, SQLite, local storage, Streamlit, Tesseract OCR, an OpenAI-compatible extraction service, Telegram reminders, and APScheduler.
@@ -104,6 +125,7 @@ The API is available at `http://127.0.0.1:8000`, Swagger at `/docs`, and Streaml
 - `GET /api/search?q=...`
 - `GET /api/dashboard`
 - `GET|PUT /api/settings`
+- `GET /api/settings/backups/{name}/download`
 - `GET /health`
 
 The scheduler synchronizes future document and event reminders at startup, checks due reminders hourly, and builds a daily report at 08:00 in `TIMEZONE`. The SQLite database is created at `data/app.db` on first backend startup.

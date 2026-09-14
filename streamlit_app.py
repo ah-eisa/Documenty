@@ -10,7 +10,12 @@ except ImportError:
     def load_dotenv(*args, **kwargs):
         return False
 load_dotenv()
-API_BASE_URL = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
+if os.getenv("API_BASE_URL"):
+    API_BASE_URL = os.getenv("API_BASE_URL", "")
+elif os.getenv("CODESPACES") == "true":
+    API_BASE_URL = "http://127.0.0.1:8000"
+else:
+    API_BASE_URL = "http://127.0.0.1:8000"
 DOCUMENT_TYPES = ["Passport", "Visa", "Insurance", "Contract", "Lease", "Bank Document", "Investment Document", "License", "Certificate", "Personal Document", "Other"]
 st.set_page_config(page_title="Personal Operations Copilot", page_icon="DOC", layout="wide")
 

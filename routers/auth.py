@@ -22,13 +22,14 @@ def login(payload: LoginRequest, request: Request, response: Response, db: Sessi
     if not token:
         raise HTTPException(status_code=401, detail="Invalid credentials")
     from config import settings
-    response.set_cookie("documenty_session", token, httponly=True, secure=settings.API_BASE_URL.startswith("https://"), samesite="lax", max_age=settings.SESSION_TTL_HOURS * 3600)
+    response.set_cookie("documenty_session", token, httponly=True, secure=settings.API_PUBLIC_URL.startswith("https://"), samesite="lax", max_age=settings.SESSION_TTL_HOURS * 3600)
     return {"access_token": token, "token_type": "bearer"}
 
 
 @router.post("/logout")
 def logout(request: Request, response: Response, db: Session = Depends(get_db)):
-    token = request.cookies.get("documenty_session")
+    authorization = request.headers.get("Authorization", "")
+    token = authorization.removeprefix("Bearer ").strip() or request.cookies.get("documenty_session")
     auth_service.revoke(db, token)
     response.delete_cookie("documenty_session")
     return {"success": True}

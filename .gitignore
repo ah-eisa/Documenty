@@ -3,6 +3,7 @@
 __pycache__/
 *.py[cod]
 data/
+backups/
 files/*
 !files/.gitkeep
 logs/*

@@ -24,15 +24,26 @@ class Settings:
     @property
     def APP_NAME(self) -> str: return os.getenv("APP_NAME", "Personal Operations Copilot")
     @property
-    def HOST(self) -> str: return os.getenv("HOST", "127.0.0.1")
+    def HOST(self) -> str: return os.getenv("HOST") or ("0.0.0.0" if os.getenv("CODESPACES") == "true" else "127.0.0.1")
     @property
     def PORT(self) -> int: return int(os.getenv("PORT", "8000"))
     @property
-    def API_BASE_URL(self) -> str: return os.getenv("API_BASE_URL", f"http://{self.HOST}:{self.PORT}")
+    def API_BASE_URL(self) -> str: return os.getenv("API_BASE_URL", f"http://127.0.0.1:{self.PORT}")
+    @property
+    def API_PUBLIC_URL(self) -> str:
+        configured = os.getenv("API_PUBLIC_URL", "").strip().rstrip("/")
+        if configured:
+            return configured
+        if os.getenv("CODESPACES") == "true" and os.getenv("CODESPACE_NAME") and os.getenv("GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN"):
+            return f"https://{os.environ['CODESPACE_NAME']}-{self.PORT}.{os.environ['GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN']}"
+        return self.API_BASE_URL
     @property
     def FRONTEND_ORIGINS(self) -> list[str]:
         raw = os.getenv("FRONTEND_ORIGINS", "http://localhost:8501,http://127.0.0.1:8501")
-        return [item.strip().rstrip("/") for item in raw.split(",") if item.strip()]
+        origins = [item.strip().rstrip("/") for item in raw.split(",") if item.strip()]
+        if os.getenv("CODESPACES") == "true" and os.getenv("CODESPACE_NAME") and os.getenv("GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN"):
+            origins.append(f"https://{os.environ['CODESPACE_NAME']}-8501.{os.environ['GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN']}")
+        return sorted(set(origins))
     @property
     def TIMEZONE(self) -> str: return os.getenv("TIMEZONE", "UTC")
     @property

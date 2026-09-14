@@ -1,6 +1,7 @@
 import re
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import FileResponse
 from config import settings, update_env_file
 from schemas import SettingsUpdate
 from services.telegram_service import send_message
@@ -46,6 +47,14 @@ def verify_backup(name: str):
     if not backup_service.verify_backup(path):
         raise HTTPException(400, "Backup integrity verification failed")
     return {"valid": True}
+
+
+@router.get("/backups/{name}/download")
+def download_backup(name: str):
+    path = (settings.BACKUP_DIR / Path(name).name).resolve()
+    if path.parent != settings.BACKUP_DIR.resolve() or not path.is_file():
+        raise HTTPException(404, "Backup not found")
+    return FileResponse(path, media_type="application/octet-stream", filename=path.name)
 
 
 @router.post("/backups/{name}/restore")

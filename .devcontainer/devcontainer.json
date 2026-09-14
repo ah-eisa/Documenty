@@ -1,0 +1,22 @@
+{
+  "name": "Documenty",
+  "image": "mcr.microsoft.com/devcontainers/python:1-3.12-bookworm",
+  "postCreateCommand": "python -m venv .venv && .venv/bin/pip install -r requirements.txt && sudo apt-get update && sudo apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-ara",
+  "forwardPorts": [8000, 8501],
+  "portsAttributes": {
+    "8000": { "label": "Documenty API", "protocol": "http", "onAutoForward": "notify" },
+    "8501": { "label": "Documenty Streamlit", "protocol": "http", "onAutoForward": "openBrowser" }
+  },
+  "remoteEnv": {
+    "HOST": "0.0.0.0",
+    "STREAMLIT_PORT": "8501"
+  },
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.defaultInterpreterPath": "${containerWorkspaceFolder}/.venv/bin/python"
+      },
+      "extensions": ["ms-python.python"]
+    }
+  }
+}
